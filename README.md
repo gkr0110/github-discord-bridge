@@ -17,83 +17,71 @@ A lightweight, configurable bridge that forwards GitHub webhook events to Discor
 
 ## Prerequisites
 
-- Python 3.14+ or Docker
-- A GitHub Repository (to set up webhooks)
-- Discord Webhook URL(s)
+- A GitHub Repository.
+- A Discord Server with permissions to manage webhooks.
+
+### Getting a Discord Webhook URL
+1. Open Discord and go to the channel where you want notifications.
+2. Click the **Edit Channel** (gear icon) next to the channel name.
+3. Go to **Integrations** -> **Webhooks**.
+4. Click **New Webhook**.
+5. Copy the **Webhook URL**. You will need this later.
 
 ## Configuration
 
 The application is configured via `config.json` and environment variables.
 
-### Environment Variables
-
+### 1. Environment Variables
 You must set the Discord Webhook URLs as environment variables. The variable names are defined in your `config.json`.
 
-Example:
 ```bash
 export DISCORD_WEBHOOK_DEV="https://discord.com/api/webhooks/..."
 export DISCORD_WEBHOOK_ALERTS="https://discord.com/api/webhooks/..."
 export DISCORD_WEBHOOK_ANNOUNCEMENTS="https://discord.com/api/webhooks/..."
 ```
 
-### `config.json`
+### 2. `config.json`
+The `config.json` file controls which GitHub events are sent to Discord.
 
-Define your workflows in `config.json`. Each workflow specifies:
-- `name`: A descriptive name.
-- `event`: The GitHub event type (e.g., `pull_request`, `push`, `issues`, `release`).
-- `filters`: Conditions that must be met (e.g., `action: opened`, `branch: refs/heads/main`).
-- `actions`: What to do when the event matches.
-    - `webhook_env`: The environment variable containing the Discord Webhook URL.
-    - `format`: The formatter to use (`pr_detailed`, `commit_simple`, `issue_priority`, `release_detailed`, `release_simple`).
+**Structure:**
+- `workflows`: A list of workflow definitions.
+  - `name`: Name of the workflow (for logging).
+  - `event`: The GitHub event to listen for (e.g., `pull_request`, `push`, `issues`, `release`).
+  - `filters`: Rules to match specific events.
+    - `action`: (Optional) Match specific action (e.g., `opened`, `closed`, `published`).
+    - `branch`: (Optional) Match specific branch (e.g., `refs/heads/main`).
+    - `labels_include`: (Optional) List of labels to match (for issues).
+  - `actions`: List of actions to take.
+    - `webhook_env`: The environment variable name that holds the Discord Webhook URL.
+    - `format`: The message format (`pr_detailed`, `commit_simple`, `issue_priority`, `release_detailed`, `release_simple`).
 
-## Installation & Usage
+**Example:**
+```json
+{
+  "workflows": [
+    {
+      "name": "New PRs",
+      "event": "pull_request",
+      "filters": { "action": "opened" },
+      "actions": [{ "webhook_env": "DISCORD_WEBHOOK_DEV", "format": "pr_detailed" }]
+    }
+  ]
+}
+```
 
-### Local Setup
+## Deployment Options
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd github-discord-bridge
-    ```
+You can run this bridge in two ways:
+1.  **GitHub Action**: Runs ephemerally within your GitHub Actions pipeline. Easiest setup for single repositories.
+2.  **Standalone Server**: Runs as a long-running web server (using Docker or Python). Suitable if you want to receive webhooks from multiple repos or don't want to use GitHub Actions.
 
-2.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+---
 
-3.  **Set environment variables:**
-    ```bash
-    export DISCORD_WEBHOOK_DEV="your_webhook_url"
-    # ... set other webhooks as needed
-    ```
-
-4.  **Run the application:**
-    ```bash
-    python main.py
-    ```
-    The server will start on port 5000.
-
-### Docker Setup
-
-1.  **Build the image:**
-    ```bash
-    docker build -t github-discord-bridge .
-    ```
-
-2.  **Run the container:**
-    ```bash
-    docker run -d \
-      -p 5000:5000 \
-      -e DISCORD_WEBHOOK_DEV="your_webhook_url" \
-      --name bridge \
-      github-discord-bridge
-    ```
-
-## Usage as GitHub Action
+### Option 1: GitHub Action
 
 You can use this bridge directly in your GitHub Actions workflows.
 
-### Example Workflow
+#### Example Workflow
 
 ```yaml
 name: GitHub-Discord Bridge
@@ -121,7 +109,52 @@ jobs:
           config_file: 'config.json' # Optional, defaults to config.json
 ```
 
-## GitHub Webhook Setup
+---
+
+### Option 2: Standalone Server
+
+#### Local Setup
+
+1.  **Clone the repository:**
+    ```bash
+    git clone <repository-url>
+    cd github-discord-bridge
+    ```
+
+2.  **Install dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+3.  **Set environment variables:**
+    ```bash
+    export DISCORD_WEBHOOK_DEV="your_webhook_url"
+    # ... set other webhooks as needed
+    ```
+
+4.  **Run the application:**
+    ```bash
+    python main.py
+    ```
+    The server will start on port 5000.
+
+#### Docker Setup
+
+1.  **Build the image:**
+    ```bash
+    docker build -t github-discord-bridge .
+    ```
+
+2.  **Run the container:**
+    ```bash
+    docker run -d \
+      -p 5000:5000 \
+      -e DISCORD_WEBHOOK_DEV="your_webhook_url" \
+      --name bridge \
+      github-discord-bridge
+    ```
+
+#### GitHub Webhook Setup (For Standalone Mode)
 
 1.  Go to your GitHub Repository Settings -> Webhooks.
 2.  Click "Add webhook".
