@@ -1,5 +1,7 @@
 # GitHub-Discord Bridge
 
+![Docker Build and Push](https://github.com/gkr0110/github-discord-bridge/actions/workflows/docker-publish.yml/badge.svg)
+
 A lightweight, configurable bridge that forwards GitHub webhook events to Discord channels using rich embeds.
 
 ## Features
