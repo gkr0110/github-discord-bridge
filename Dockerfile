@@ -12,4 +12,4 @@ COPY config.json .
 ENV PORT=5000
 EXPOSE 5000
 
-CMD ["python", "main.py"]
+CMD ["python", "/app/main.py"]
