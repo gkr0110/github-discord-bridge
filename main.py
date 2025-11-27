@@ -170,17 +170,7 @@ def check_filters(filters, data, event_type):
             
     return True
 
-@app.route("/webhook", methods=["POST"])
-def webhook():
-    event_type = request.headers.get("X-GitHub-Event")
-    data = request.json
-    
-    if not data:
-        return jsonify({"error": "No data received"}), 400
-        
-    if event_type == "ping":
-        return jsonify({"message": "Pong!"}), 200
-
+def process_event(event_type, data):
     triggered_actions = 0
     
     for workflow in CONFIG.get("workflows", []):
@@ -210,6 +200,21 @@ def webhook():
                     triggered_actions += 1
             else:
                 logger.error(f"Unknown formatter: {formatter_name}")
+                
+    return triggered_actions
+
+@app.route("/webhook", methods=["POST"])
+def webhook():
+    event_type = request.headers.get("X-GitHub-Event")
+    data = request.json
+    
+    if not data:
+        return jsonify({"error": "No data received"}), 400
+        
+    if event_type == "ping":
+        return jsonify({"message": "Pong!"}), 200
+
+    triggered_actions = process_event(event_type, data)
 
     return jsonify({"message": f"Processed event. Triggered {triggered_actions} actions."}), 200
 
@@ -218,4 +223,27 @@ def health():
     return jsonify({"status": "healthy"}), 200
 
 if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000)
+    if os.environ.get("GITHUB_ACTIONS") == "true":
+        # Run in "One-shot" mode for GitHub Actions
+        logger.info("Running in GitHub Action mode")
+        
+        event_path = os.environ.get("GITHUB_EVENT_PATH")
+        event_name = os.environ.get("GITHUB_EVENT_NAME")
+        
+        if not event_path or not event_name:
+            logger.error("Missing GITHUB_EVENT_PATH or GITHUB_EVENT_NAME")
+            exit(1)
+            
+        try:
+            with open(event_path, "r") as f:
+                event_data = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load event data: {e}")
+            exit(1)
+            
+        count = process_event(event_name, event_data)
+        logger.info(f"Processed event '{event_name}'. Triggered {count} actions.")
+    else:
+        # Run in Server mode
+        logger.info("Running in Server mode")
+        app.run(host="0.0.0.0", port=5000)
