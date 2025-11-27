@@ -12,11 +12,12 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Load configuration
+config_file = os.environ.get("CONFIG_FILE", "config.json")
 try:
-    with open("config.json", "r") as f:
+    with open(config_file, "r") as f:
         CONFIG = json.load(f)
 except FileNotFoundError:
-    logger.error("config.json not found!")
+    logger.error(f"{config_file} not found!")
     CONFIG = {"workflows": []}
 
 def send_discord_message(webhook_url, embed=None, content=None):

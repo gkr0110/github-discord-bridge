@@ -89,6 +89,38 @@ Define your workflows in `config.json`. Each workflow specifies:
       github-discord-bridge
     ```
 
+## Usage as GitHub Action
+
+You can use this bridge directly in your GitHub Actions workflows.
+
+### Example Workflow
+
+```yaml
+name: GitHub-Discord Bridge
+
+on:
+  push:
+  pull_request:
+  issues:
+  release:
+    types: [published]
+
+jobs:
+  bridge:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Bridge
+        uses: gkr0110/github-discord-bridge@main
+        with:
+          webhook_dev: ${{ secrets.DISCORD_WEBHOOK_DEV }}
+          webhook_alerts: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
+          webhook_announcements: ${{ secrets.DISCORD_WEBHOOK_ANNOUNCEMENTS }}
+          config_file: 'config.json' # Optional, defaults to config.json
+```
+
 ## GitHub Webhook Setup
 
 1.  Go to your GitHub Repository Settings -> Webhooks.
