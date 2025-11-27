@@ -31,13 +31,7 @@
             "name": "High Priority Issues",
             "event": "issues",
             "filters": {
-                "action": "opened",
-                "labels_include": [
-                    "bug",
-                    "urgent",
-                    "critical",
-                    "priority"
-                ]
+                "action": "opened"
             },
             "actions": [
                 {
