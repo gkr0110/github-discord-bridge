@@ -13,6 +13,9 @@ logger = logging.getLogger(__name__)
 
 # Load configuration
 config_file = os.environ.get("CONFIG_FILE", "config.json")
+# If running in GitHub Actions and config_file is relative, use /app/ prefix
+if os.environ.get("GITHUB_ACTIONS") == "true" and not os.path.isabs(config_file):
+    config_file = f"/app/{config_file}"
 try:
     with open(config_file, "r") as f:
         CONFIG = json.load(f)
