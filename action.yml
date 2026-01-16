@@ -17,3 +17,6 @@ runs:
     DISCORD_WEBHOOK_DEV: ${{ inputs.webhook_dev }}
     DISCORD_WEBHOOK_ALERTS: ${{ inputs.webhook_alerts }}
     DISCORD_WEBHOOK_ANNOUNCEMENTS: ${{ inputs.webhook_announcements }}
+    branding:
+      icon: bell
+        color: 'blue'
