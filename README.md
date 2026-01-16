@@ -2,163 +2,216 @@
 
 ![Docker Build and Push](https://github.com/gkr0110/github-discord-bridge/actions/workflows/docker-publish.yml/badge.svg)
 
-A lightweight, configurable bridge that forwards GitHub webhook events to Discord channels using rich embeds.
+A lightweight, zero-config bridge that forwards GitHub webhook events to Discord channels with automatic formatting based on event type.
 
 ## Features
 
-- **Pull Requests**: Detailed notifications for new PRs (title, author, branch, description).
-- **Commits**: Simple alerts for pushes to the main branch.
-- **Issues**: Priority alerts for issues with specific labels (e.g., `bug`, `critical`).
-- **Releases**:
-    - Detailed announcements for dev releases.
-    - Simplified announcements for public releases.
-- **Flexible Filtering**: Filter events by action, branch, labels, draft status, and more.
-- **Multiple Workflows**: Route different events to different Discord channels.
+- **Zero Configuration**: No config file needed! Formatting is automatically detected based on the event type.
+- **Pull Requests**: Rich notifications for opened/closed/reopened PRs with details, author, and branch info.
+- **Commits**: Smart push notifications to alerts channel for main branch, dev channel for others.
+- **Issues**: Detailed issue notifications with labels and reporter info.
+- **Releases**: 
+  - Rich embeds for main releases (to announcements channel).
+  - Simple messages for pre-releases (to dev channel).
+- **Automatic Routing**: Events are routed to the appropriate Discord channel based on context.
+- **Draft Filtering**: Automatically ignores draft PRs and releases.
+
+## How It Works
+
+The bridge automatically determines which Discord webhook to use based on the event type and context:
+
+| Event | Condition | Webhook |
+|-------|-----------|---------|
+| Pull Request | Any action (except draft) | `DISCORD_WEBHOOK_DEV` |
+| Push | To main branch | `DISCORD_WEBHOOK_ALERTS` |
+| Push | To other branches | `DISCORD_WEBHOOK_DEV` |
+| Issue | Any action (except PRs) | `DISCORD_WEBHOOK_DEV` |
+| Release | Pre-release | `DISCORD_WEBHOOK_DEV` |
+| Release | Main release | `DISCORD_WEBHOOK_ANNOUNCEMENTS` |
 
 ## Prerequisites
 
 - A GitHub Repository.
 - A Discord Server with permissions to manage webhooks.
 
-### Getting a Discord Webhook URL
-1. Open Discord and go to the channel where you want notifications.
-2. Click the **Edit Channel** (gear icon) next to the channel name.
-3. Go to **Integrations** -> **Webhooks**.
-4. Click **New Webhook**.
-5. Copy the **Webhook URL**. You will need this later.
+### Getting Discord Webhook URLs
+
+For each Discord channel where you want notifications:
+
+1. Open Discord and go to the channel.
+2. Click the **Settings** icon (gear) next to the channel name.
+3. Go to **Integrations** → **Webhooks**.
+4. Click **New Webhook**, then **Copy Webhook URL**.
+5. Save these URLs as repository secrets (see deployment instructions).
 
 ## Configuration
 
-The application is configured via `config.json` and environment variables.
+The bridge requires only **environment variables** pointing to Discord webhook URLs. No config file needed!
 
-### 1. Environment Variables
-You must set the Discord Webhook URLs as environment variables. The variable names are defined in your `config.json`.
+### Environment Variables
+
+Set these as repository secrets or environment variables:
 
 ```bash
-export DISCORD_WEBHOOK_DEV="https://discord.com/api/webhooks/..."
-export DISCORD_WEBHOOK_ALERTS="https://discord.com/api/webhooks/..."
-export DISCORD_WEBHOOK_ANNOUNCEMENTS="https://discord.com/api/webhooks/..."
+DISCORD_WEBHOOK_DEV          # For PRs, issues, pre-releases, dev branch pushes
+DISCORD_WEBHOOK_ALERTS       # For main branch pushes
+DISCORD_WEBHOOK_ANNOUNCEMENTS # For main releases
 ```
 
-### 2. `config.json`
-The `config.json` file controls which GitHub events are sent to Discord.
-
-**Structure:**
-- `workflows`: A list of workflow definitions.
-  - `name`: Name of the workflow (for logging).
-  - `event`: The GitHub event to listen for (e.g., `pull_request`, `push`, `issues`, `release`).
-  - `filters`: Rules to match specific events.
-    - `action`: (Optional) Match specific action (e.g., `opened`, `closed`, `published`).
-    - `branch`: (Optional) Match specific branch (e.g., `refs/heads/main`).
-    - `labels_include`: (Optional) List of labels to match (for issues).
-  - `actions`: List of actions to take.
-    - `webhook_env`: The environment variable name that holds the Discord Webhook URL.
-    - `format`: The message format (`pr_detailed`, `commit_simple`, `issue_priority`, `release_detailed`, `release_simple`).
-
-**Example:**
-```json
-{
-  "workflows": [
-    {
-      "name": "New PRs",
-      "event": "pull_request",
-      "filters": { "action": "opened" },
-      "actions": [{ "webhook_env": "DISCORD_WEBHOOK_DEV", "format": "pr_detailed" }]
-    }
-  ]
-}
-```
+All are optional - just set the ones you need. If a webhook isn't configured for an event type, that event is skipped.
 
 ## Deployment Options
 
-You can run this bridge in two ways:
-1.  **GitHub Action**: Runs ephemerally within your GitHub Actions pipeline. Easiest setup for single repositories.
-2.  **Standalone Server**: Runs as a long-running web server (using Docker or Python). Suitable if you want to receive webhooks from multiple repos or don't want to use GitHub Actions.
+### Option 1: GitHub Action (Recommended for Single Repo)
 
----
-
-### Option 1: GitHub Action
-
-You can use this bridge directly in your GitHub Actions workflows.
+The easiest setup - runs within your GitHub Actions pipeline.
 
 #### Example Workflow
 
 ```yaml
-name: GitHub-Discord Bridge
+name: Notify Discord
 
 on:
   push:
   pull_request:
   issues:
   release:
-    types: [published]
+    types: [published, created]
 
 jobs:
-  bridge:
+  discord-bridge:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Run Bridge
+      - name: GitHub-Discord Bridge
         uses: gkr0110/github-discord-bridge@main
         with:
           webhook_dev: ${{ secrets.DISCORD_WEBHOOK_DEV }}
           webhook_alerts: ${{ secrets.DISCORD_WEBHOOK_ALERTS }}
           webhook_announcements: ${{ secrets.DISCORD_WEBHOOK_ANNOUNCEMENTS }}
-          config_file: 'config.json' # Optional, defaults to config.json
 ```
+
+#### Setup Instructions
+
+1. Add the workflow file above to `.github/workflows/discord-notify.yml` in your repository.
+2. Go to **Settings** → **Secrets and variables** → **Actions**.
+3. Add the three secrets: `DISCORD_WEBHOOK_DEV`, `DISCORD_WEBHOOK_ALERTS`, `DISCORD_WEBHOOK_ANNOUNCEMENTS`.
+4. Commit and push - notifications will start immediately!
 
 ---
 
-### Option 2: Standalone Server
+### Option 2: Standalone Server (For Multiple Repos or Webhooks)
 
-#### Local Setup
+Run the bridge as a persistent web server.
 
-1.  **Clone the repository:**
-    ```bash
-    git clone <repository-url>
-    cd github-discord-bridge
-    ```
+#### Local Development
 
-2.  **Install dependencies:**
-    ```bash
-    pip install -r requirements.txt
-    ```
+1. **Clone and setup:**
+   ```bash
+   git clone <repository-url>
+   cd github-discord-bridge
+   pip install -r requirements.txt
+   ```
 
-3.  **Set environment variables:**
-    ```bash
-    export DISCORD_WEBHOOK_DEV="your_webhook_url"
-    # ... set other webhooks as needed
-    ```
+2. **Set environment variables:**
+   ```bash
+   export DISCORD_WEBHOOK_DEV="https://discord.com/api/webhooks/..."
+   export DISCORD_WEBHOOK_ALERTS="https://discord.com/api/webhooks/..."
+   export DISCORD_WEBHOOK_ANNOUNCEMENTS="https://discord.com/api/webhooks/..."
+   ```
 
-4.  **Run the application:**
-    ```bash
-    python main.py
-    ```
-    The server will start on port 5000.
+3. **Run:**
+   ```bash
+   python main.py
+   ```
+   Server runs on `http://localhost:5000/webhook`
 
-#### Docker Setup
+#### Docker Deployment
 
-1.  **Build the image:**
-    ```bash
-    docker build -t github-discord-bridge .
-    ```
+1. **Build:**
+   ```bash
+   docker build -t github-discord-bridge .
+   ```
 
-2.  **Run the container:**
-    ```bash
-    docker run -d \
-      -p 5000:5000 \
-      -e DISCORD_WEBHOOK_DEV="your_webhook_url" \
-      --name bridge \
-      github-discord-bridge
-    ```
+2. **Run:**
+   ```bash
+   docker run -d \
+     -p 5000:5000 \
+     -e DISCORD_WEBHOOK_DEV="your_webhook_url" \
+     -e DISCORD_WEBHOOK_ALERTS="your_webhook_url" \
+     -e DISCORD_WEBHOOK_ANNOUNCEMENTS="your_webhook_url" \
+     --name bridge \
+     github-discord-bridge
+   ```
 
-#### GitHub Webhook Setup (For Standalone Mode)
+#### Configure GitHub Webhooks
 
-1.  Go to your GitHub Repository Settings -> Webhooks.
-2.  Click "Add webhook".
-3.  **Payload URL**: `http://<your-server-ip>:5000/webhook`
-4.  **Content type**: `application/json`
-5.  **Which events would you like to trigger this webhook?**: Select "Let me select individual events" and choose the events you configured (Pull requests, Pushes, Issues, Releases).
-6.  Click "Add webhook".
+For each repository:
+
+1. Go to **Settings** → **Webhooks** → **Add webhook**.
+2. **Payload URL**: `https://your-server.com:5000/webhook`
+3. **Content type**: `application/json`
+4. **Events**: Select the events you want to monitor (Pushes, Pull requests, Issues, Releases).
+5. **Active**: Check the box.
+6. Click **Add webhook**.
+
+Test the webhook from GitHub's webhook settings page.
+
+---
+
+## Message Formatting
+
+The bridge automatically formats messages based on event type. Here are examples:
+
+### Pull Request
+```
+🔄 PR Opened: Fix authentication bug
+Repository: myorg/myrepo
+Branch: `feature/auth` → `main`
+Author: johndoe
+```
+
+### Main Branch Push
+```
+🔨 johndoe pushed 3 commits to `main` in `myorg/myrepo` (latest: Merge pull request #42)
+```
+
+### Issue
+```
+🚨 Issue Opened: Memory leak in cache system
+Repository: myorg/myrepo
+Reporter: janedoe
+Labels: bug, critical
+```
+
+### Release
+```
+🚀 New Release: v1.2.0
+Tag: v1.2.0
+Repository: myorg/myrepo
+```
+
+## Health Check
+
+Both GitHub Action and server modes support a health check endpoint:
+
+```bash
+curl http://localhost:5000/health
+# Returns: {"status": "healthy"}
+```
+
+## Troubleshooting
+
+**Events not showing up in Discord?**
+- Check that webhook URLs are set correctly (they should start with `https://discord.com/api/webhooks/`).
+- Verify the webhook channel still exists and is accessible.
+- Check logs for any error messages.
+
+**Wrong channel receiving events?**
+- Review the routing table above to ensure your webhooks are assigned to the expected channels.
+
+**Draft PRs/Releases appearing?**
+- Draft content is automatically filtered out - this is by design.
+
+## License
+
+MIT

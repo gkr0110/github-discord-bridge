@@ -1,19 +1,15 @@
 name: 'GitHub-Discord Bridge'
-description: 'Forwards GitHub webhook events to Discord channels'
+description: 'Forwards GitHub webhook events to Discord channels with automatic formatting'
 inputs:
   webhook_dev:
-    description: 'Discord Webhook URL for Dev channel'
+    description: 'Discord Webhook URL for Dev channel (PRs, issues, pre-releases)'
     required: false
   webhook_alerts:
-    description: 'Discord Webhook URL for Alerts channel'
+    description: 'Discord Webhook URL for Alerts channel (main branch pushes)'
     required: false
   webhook_announcements:
-    description: 'Discord Webhook URL for Announcements channel'
+    description: 'Discord Webhook URL for Announcements channel (main releases)'
     required: false
-  config_file:
-    description: 'Path to the configuration JSON file'
-    required: false
-    default: 'config.json'
 runs:
   using: 'docker'
   image: 'Dockerfile'
@@ -21,4 +17,3 @@ runs:
     DISCORD_WEBHOOK_DEV: ${{ inputs.webhook_dev }}
     DISCORD_WEBHOOK_ALERTS: ${{ inputs.webhook_alerts }}
     DISCORD_WEBHOOK_ANNOUNCEMENTS: ${{ inputs.webhook_announcements }}
-    CONFIG_FILE: ${{ inputs.config_file }}
